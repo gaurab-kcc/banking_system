@@ -126,8 +126,8 @@ if (isset($_POST["update_profile"])) {
     $setting_email = mysqli_real_escape_string($conn, $_POST["setting_email"]);
     $setting_phone = mysqli_real_escape_string($conn, $_POST["setting_phone"]);
 
-    $sql_setting_update = "UPDATE users 
-                           SET username='$setting_name', email='$setting_email', phone='$setting_phone' 
+    $sql_setting_update = "UPDATE users
+                           SET username='$setting_name', email='$setting_email', phone='$setting_phone'
                            WHERE id='$user_id'";
 
     if (mysqli_query($conn, $sql_setting_update)) {
@@ -142,6 +142,39 @@ if (isset($_POST["update_profile"])) {
          </script>";
     } else {
         echo "<script>alert('❌ Error updating profile: " . mysqli_error($conn) . "');</script>";
+    }
+}
+
+// Handle Change Password
+if (isset($_POST["change_password"])) {
+    $current_password = mysqli_real_escape_string($conn, $_POST["current_password"]);
+    $new_password = mysqli_real_escape_string($conn, $_POST["new_password"]);
+    $confirm_password = mysqli_real_escape_string($conn, $_POST["confirm_password"]);
+
+    // Get current password from database
+    $sql_get_password = "SELECT password FROM users WHERE id='$user_id'";
+    $result_password = mysqli_query($conn, $sql_get_password);
+    $row_password = mysqli_fetch_assoc($result_password);
+
+    if ($row_password && password_verify($current_password, $row_password['password'])) {
+        if ($new_password === $confirm_password) {
+            if (strlen($new_password) >= 6) {
+                $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+                $sql_update_password = "UPDATE users SET password='$hashed_password' WHERE id='$user_id'";
+
+                if (mysqli_query($conn, $sql_update_password)) {
+                    echo "<script>alert('✅ Password changed successfully!'); window.location.href='dashboard.php';</script>";
+                } else {
+                    echo "<script>alert('❌ Error updating password!');</script>";
+                }
+            } else {
+                echo "<script>alert('❌ Password must be at least 6 characters long!');</script>";
+            }
+        } else {
+            echo "<script>alert('❌ New passwords do not match!');</script>";
+        }
+    } else {
+        echo "<script>alert('❌ Current password is incorrect!');</script>";
     }
 }
 
@@ -176,25 +209,35 @@ if (isset($_POST["transfer"])) {
             // Check sufficient balance based on selected account
             if ($from_account == 'Checking Account') {
                 if ($sender_balance >= $transfer_amount) {
-                      
-                    $summaryTotal = $transfer_amount;  ////// latter for data to be shown when entry transfer amount 
+
+                    $summaryTotal = $transfer_amount;  ////// latter for data to be shown when entry transfer amount
 
 
                     // Deduct from sender's checking account
                     $new_balance = $sender_balance - $transfer_amount;
-                    $sql_sender_update = "UPDATE amounts 
-                                           SET total_balance = $new_balance, 
-                                               expenses = expenses + $transfer_amount 
+                    $sql_sender_update = "UPDATE amounts
+                                           SET total_balance = $new_balance,
+                                               expenses = expenses + $transfer_amount
                                            WHERE user_id='$user_id'";
 
                     // Add to recipient's checking account
-                    $sql_recipient_update = "UPDATE amounts 
-                                              SET total_balance = total_balance + $transfer_amount, 
-                                                  income = income + $transfer_amount 
+                    $sql_recipient_update = "UPDATE amounts
+                                              SET total_balance = total_balance + $transfer_amount,
+                                                  income = income + $transfer_amount
                                               WHERE user_id='$recipient_id'";
 
                     if (mysqli_query($conn, $sql_sender_update) && mysqli_query($conn, $sql_recipient_update)) {
-                        echo "<script> window.location.href='dashboard.php';</script>";
+                        // Record transaction for sender
+                        $sql_transaction = "INSERT INTO transactions (user_id, type, amount, description, from_account, to_account, status)
+                                           VALUES ('$user_id', 'transfer_sent', $transfer_amount, '$transfer_description', '$from_account', '$transfer_email', 'completed')";
+                        mysqli_query($conn, $sql_transaction);
+
+                        // Record transaction for recipient
+                        $sql_transaction_recipient = "INSERT INTO transactions (user_id, type, amount, description, from_account, to_account, status)
+                                                      VALUES ('$recipient_id', 'transfer_received', $transfer_amount, '$transfer_description', '$email', 'Checking Account', 'completed')";
+                        mysqli_query($conn, $sql_transaction_recipient);
+
+                        echo "<script>alert('✅ Transfer successful!'); window.location.href='dashboard.php';</script>";
                     } else {
                         echo "<script>alert('❌ Transfer failed!');</script>";
                     }
@@ -205,18 +248,28 @@ if (isset($_POST["transfer"])) {
                 if ($sender_savings >= $transfer_amount) {
                     // Deduct from sender's savings account
                     $new_savings = $sender_savings - $transfer_amount;
-                    $sql_sender_update = "UPDATE amounts 
-                                           SET savings = $new_savings, 
-                                               expenses = expenses + $transfer_amount 
+                    $sql_sender_update = "UPDATE amounts
+                                           SET savings = $new_savings,
+                                               expenses = expenses + $transfer_amount
                                            WHERE user_id='$user_id'";
 
                     // Add to recipient's checking account
-                    $sql_recipient_update = "UPDATE amounts 
-                                              SET total_balance = total_balance + $transfer_amount, 
-                                                  income = income + $transfer_amount 
+                    $sql_recipient_update = "UPDATE amounts
+                                              SET total_balance = total_balance + $transfer_amount,
+                                                  income = income + $transfer_amount
                                               WHERE user_id='$recipient_id'";
 
                     if (mysqli_query($conn, $sql_sender_update) && mysqli_query($conn, $sql_recipient_update)) {
+                        // Record transaction for sender
+                        $sql_transaction = "INSERT INTO transactions (user_id, type, amount, description, from_account, to_account, status)
+                                           VALUES ('$user_id', 'transfer_sent', $transfer_amount, '$transfer_description', '$from_account', '$transfer_email', 'completed')";
+                        mysqli_query($conn, $sql_transaction);
+
+                        // Record transaction for recipient
+                        $sql_transaction_recipient = "INSERT INTO transactions (user_id, type, amount, description, from_account, to_account, status)
+                                                      VALUES ('$recipient_id', 'transfer_received', $transfer_amount, '$transfer_description', '$email', 'Checking Account', 'completed')";
+                        mysqli_query($conn, $sql_transaction_recipient);
+
                         echo "<script>alert('✅ Transfer successful!'); window.location.href='dashboard.php';</script>";
                     } else {
                         echo "<script>alert('❌ Transfer failed!');</script>";
@@ -234,18 +287,23 @@ if (isset($_POST["transfer"])) {
                 if ($sender_balance >= $transfer_amount) {
                     // Deduct from sender's checking account
                     $new_balance = $sender_balance - $transfer_amount;
-                    $sql_sender_update = "UPDATE amounts 
-                                           SET total_balance = $new_balance, 
-                                               expenses = expenses + $transfer_amount 
+                    $sql_sender_update = "UPDATE amounts
+                                           SET total_balance = $new_balance,
+                                               expenses = expenses + $transfer_amount
                                            WHERE user_id='$user_id'";
 
                     // Add to admin's account
-                    $sql_admin_update = "UPDATE amounts 
-                                          SET total_balance = total_balance + $transfer_amount, 
-                                              income = income + $transfer_amount 
+                    $sql_admin_update = "UPDATE amounts
+                                          SET total_balance = total_balance + $transfer_amount,
+                                              income = income + $transfer_amount
                                           WHERE user_id='$admin_id'";
 
                     if (mysqli_query($conn, $sql_sender_update) && mysqli_query($conn, $sql_admin_update)) {
+                        // Record transaction
+                        $sql_transaction = "INSERT INTO transactions (user_id, type, amount, description, from_account, to_account, status)
+                                           VALUES ('$user_id', 'transfer_sent', $transfer_amount, '$transfer_description', '$from_account', '$transfer_email', 'completed')";
+                        mysqli_query($conn, $sql_transaction);
+
                         echo "<script>alert('✅ Transfer to admin successful!'); window.location.href='dashboard.php';</script>";
                     } else {
                         echo "<script>alert('❌ Transfer failed!');</script>";
@@ -257,18 +315,23 @@ if (isset($_POST["transfer"])) {
                 if ($sender_savings >= $transfer_amount) {
                     // Deduct from sender's savings account
                     $new_savings = $sender_savings - $transfer_amount;
-                    $sql_sender_update = "UPDATE amounts 
-                                           SET savings = $new_savings, 
-                                               expenses = expenses + $transfer_amount 
+                    $sql_sender_update = "UPDATE amounts
+                                           SET savings = $new_savings,
+                                               expenses = expenses + $transfer_amount
                                            WHERE user_id='$user_id'";
 
                     // Add to admin's account
-                    $sql_admin_update = "UPDATE amounts 
-                                          SET total_balance = total_balance + $transfer_amount, 
-                                              income = income + $transfer_amount 
+                    $sql_admin_update = "UPDATE amounts
+                                          SET total_balance = total_balance + $transfer_amount,
+                                              income = income + $transfer_amount
                                           WHERE user_id='$admin_id'";
 
                     if (mysqli_query($conn, $sql_sender_update) && mysqli_query($conn, $sql_admin_update)) {
+                        // Record transaction
+                        $sql_transaction = "INSERT INTO transactions (user_id, type, amount, description, from_account, to_account, status)
+                                           VALUES ('$user_id', 'transfer_sent', $transfer_amount, '$transfer_description', '$from_account', '$transfer_email', 'completed')";
+                        mysqli_query($conn, $sql_transaction);
+
                         echo "<script>alert('✅ Transfer to admin successful!'); window.location.href='dashboard.php';</script>";
                     } else {
                         echo "<script>alert('❌ Transfer failed!');</script>";
@@ -440,7 +503,7 @@ if (mysqli_num_rows($result_amount) > 0) {
                             <i class="fas fa-credit-card"></i>
                             <span>Manage Cards</span>
                         </button>
-                        <button class="action-btn">
+                        <button class="action-btn" onclick="downloadStatement()">
                             <i class="fas fa-download"></i>
                             <span>Download Statement</span>
                         </button>
@@ -454,7 +517,43 @@ if (mysqli_num_rows($result_amount) > 0) {
                         <button class="view-all-btn" onclick="showSection('transactions')">View All</button>
                     </div>
                     <div class="transactions-list" id="recentTransactionsList">
-                        <!-- Transactions will be loaded here -->
+                        <?php
+                        if (isset($transactions) && count($transactions) > 0) {
+                            foreach (array_slice($transactions, 0, 5) as $transaction) {
+                                $icon_class = '';
+                                $amount_class = '';
+                                $icon = '';
+                                $sign = '';
+
+                                if ($transaction['type'] == 'transfer_received' || $transaction['type'] == 'income') {
+                                    $icon_class = 'income';
+                                    $amount_class = 'positive';
+                                    $icon = 'fa-arrow-down';
+                                    $sign = '+';
+                                } else {
+                                    $icon_class = 'expense';
+                                    $amount_class = 'negative';
+                                    $icon = 'fa-arrow-up';
+                                    $sign = '-';
+                                }
+
+                                echo '<div class="transaction-item">';
+                                echo '  <div class="transaction-info">';
+                                echo '    <div class="transaction-icon ' . $icon_class . '">';
+                                echo '      <i class="fas ' . $icon . '"></i>';
+                                echo '    </div>';
+                                echo '    <div class="transaction-details">';
+                                echo '      <h4>' . ucfirst(str_replace('_', ' ', $transaction['type'])) . '</h4>';
+                                echo '      <p>' . htmlspecialchars($transaction['description'] ?: $transaction['to_account']) . ' • ' . date('M d, Y', strtotime($transaction['created_at'])) . '</p>';
+                                echo '    </div>';
+                                echo '  </div>';
+                                echo '  <div class="transaction-amount ' . $amount_class . '">' . $sign . 'Rs' . number_format($transaction['amount'], 2) . '</div>';
+                                echo '</div>';
+                            }
+                        } else {
+                            echo '<p style="text-align: center; color: #6b7280; padding: 2rem;">No transactions found</p>';
+                        }
+                        ?>
                     </div>
                 </div>
             </div>
@@ -529,7 +628,35 @@ if (mysqli_num_rows($result_amount) > 0) {
                         </div>
                     </div>
                     <div class="table-body" id="transactionsTableBody">
-                        <!-- Transactions will be loaded here -->
+                        <?php
+                        if (isset($transactions) && count($transactions) > 0) {
+                            foreach ($transactions as $transaction) {
+                                $icon_class = '';
+                                $amount_class = '';
+                                $sign = '';
+
+                                if ($transaction['type'] == 'transfer_received' || $transaction['type'] == 'income') {
+                                    $icon_class = 'income';
+                                    $amount_class = 'positive';
+                                    $sign = '+';
+                                } else {
+                                    $icon_class = 'expense';
+                                    $amount_class = 'negative';
+                                    $sign = '-';
+                                }
+
+                                echo '<div class="table-row" data-type="' . $transaction['type'] . '">';
+                                echo '  <div class="table-cell">' . date('M d, Y h:i A', strtotime($transaction['created_at'])) . '</div>';
+                                echo '  <div class="table-cell">' . htmlspecialchars($transaction['from_account'] ?: 'N/A') . '</div>';
+                                echo '  <div class="table-cell"><span class="badge ' . $icon_class . '">' . ucfirst(str_replace('_', ' ', $transaction['type'])) . '</span></div>';
+                                echo '  <div class="table-cell"><span class="transaction-amount ' . $amount_class . '">' . $sign . 'Rs' . number_format($transaction['amount'], 2) . '</span></div>';
+                                echo '  <div class="table-cell">' . htmlspecialchars($transaction['description'] ?: $transaction['to_account']) . '</div>';
+                                echo '</div>';
+                            }
+                        } else {
+                            echo '<div style="text-align: center; color: #6b7280; padding: 2rem;">No transactions found</div>';
+                        }
+                        ?>
                     </div>
                 </div>
             </div>
@@ -689,13 +816,39 @@ if (mysqli_num_rows($result_amount) > 0) {
                                 </label>
                             </div>
                         </div>
-                        <button class="btn btn-outline">Change Password</button>
+                        <button class="btn btn-outline" onclick="showPasswordModal()">Change Password</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
     
+    <!-- Password Change Modal -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closePasswordModal()">&times;</span>
+            <h2>Change Password</h2>
+            <form method="POST" action="dashboard.php" onsubmit="return validatePasswordForm()">
+                <div class="form-group">
+                    <label>Current Password</label>
+                    <input type="password" name="current_password" id="currentPassword" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>New Password</label>
+                    <input type="password" name="new_password" id="newPassword" class="form-control" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label>Confirm New Password</label>
+                    <input type="password" name="confirm_password" id="confirmPassword" class="form-control" required minlength="6">
+                </div>
+                <div style="display: flex; gap: 1rem;">
+                    <button type="submit" name="change_password" class="btn btn-primary">Change Password</button>
+                    <button type="button" class="btn btn-outline" onclick="closePasswordModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script type="module" src="../js/dashboard.js"></script>
 </body>
 </html>

@@ -968,33 +968,122 @@ input:checked + .slider:before {
     }
 }
 
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    position: relative;
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.modal-content h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 1.5rem;
+}
+
+.modal-close {
+    position: absolute;
+    right: 1.5rem;
+    top: 1.5rem;
+    font-size: 2rem;
+    font-weight: 300;
+    color: #6b7280;
+    cursor: pointer;
+    line-height: 1;
+    transition: all 0.3s ease;
+}
+
+.modal-close:hover {
+    color: #1f2937;
+    transform: rotate(90deg);
+}
+
+/* Badge Styles */
+.badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.badge.income {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+}
+
+.badge.expense {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.badge.transfer {
+    background: rgba(37, 99, 235, 0.1);
+    color: #2563eb;
+}
+
 @media (max-width: 480px) {
     .dashboard-header {
         padding: 1rem;
     }
-    
+
     .summary-card {
         padding: 1.5rem;
     }
-    
+
     .amount {
         font-size: 1.5rem;
     }
-    
+
     .action-buttons {
         grid-template-columns: 1fr;
     }
-    
+
     .transfer-form-card, .settings-section {
         padding: 1.5rem;
     }
-    
+
     .credit-card {
         height: 180px;
         padding: 1.5rem;
     }
-    
+
     .card-number {
         font-size: 1.2rem;
+    }
+
+    .modal-content {
+        width: 95%;
+        padding: 1.5rem;
     }
 }
